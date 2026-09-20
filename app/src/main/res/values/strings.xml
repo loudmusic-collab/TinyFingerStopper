@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tiny Finger Stopper</string>
+    <string name="player_title">Kid Player</string>
+
+    <string name="tile_label_off">Kid lock</string>
+    <string name="tile_label_on">Kid lock on</string>
+    <string name="tile_subtitle_off">Tap to lock the screen</string>
+    <string name="tile_subtitle_on">Hold two opposite corners</string>
+
+    <string name="channel_name">Kid lock</string>
+    <string name="channel_description">Shown while the screen is locked for a child.</string>
+    <string name="notification_title">Screen locked for little hands</string>
+    <string name="notification_text">Hold two opposite corners for two seconds to unlock. Restarting the phone also unlocks it.</string>
+    <string name="action_unlock">Unlock</string>
+
+    <string name="error_no_overlay_permission">Tiny Finger Stopper needs the "display over other apps" permission before it can lock the screen.</string>
+    <string name="error_overlay_failed">Could not put the lock on screen. Check the "display over other apps" permission.</string>
+    <string name="error_no_video_id">Paste a YouTube link or an 11-character video id.</string>
+    <string name="snap_back_gave_up">Something kept pulling the locked app off screen, so the lock was released.</string>
+
+    <string name="setup_overlay_heading">Overlay lock</string>
+    <string name="setup_overlay_body">Works over any app. Start a video in YouTube, Disney+ or anything else, pull down Quick Settings and tap the Kid lock tile. Touches stop reaching the app underneath.</string>
+
+    <string name="step_overlay_title">Display over other apps</string>
+    <string name="step_overlay_detail">Required. This is the permission that puts the touch blocker on screen.</string>
+    <string name="step_notifications_title">Notifications</string>
+    <string name="step_notifications_detail">Required. The ongoing notification is how the lock stays running, and it carries an Unlock button.</string>
+    <string name="step_usage_title">Usage access</string>
+    <string name="step_usage_detail">Optional. Android will not let any app block the Home gesture, so with this granted the lock instead notices the escape and brings the video straight back.</string>
+    <string name="step_tile_title">Quick Settings tile</string>
+    <string name="step_tile_detail">Optional. Adds the Kid lock tile so you can arm it in one tap.</string>
+    <string name="step_tile_detail_manual">To add the tile: pull down Quick Settings, tap the edit (pencil) button, and drag "Kid lock" into the panel.</string>
+    <string name="action_grant">Grant</string>
+    <string name="action_add_tile">Add tile</string>
+    <string name="action_open_settings">Open settings</string>
+
+    <string name="setup_player_heading">Kid Player</string>
+    <string name="setup_player_body">Stronger, YouTube only. The video plays inside this app, which lets it use Android\'s own screen pinning to block Home, Recents and the notification shade outright. You can also share a YouTube link into Tiny Finger Stopper from anywhere.</string>
+    <string name="step_pinning_title">Ask for PIN before unpinning</string>
+    <string name="step_pinning_detail">Strongly recommended. In Security (or Security and privacy) find App pinning, turn it on, and turn on "Ask for PIN before unpinning". With that set, leaving Kid Player needs your device PIN.</string>
+    <string name="video_hint">YouTube link or video id</string>
+    <string name="action_play_locked">Play locked</string>
+
+    <string name="setup_unlock_help">To unlock either mode: put one finger in one corner and another finger in the diagonally opposite corner, and hold for two seconds.</string>
+    <string name="setup_reboot_help">Restarting the phone always cancels the lock. Nothing about the lock is saved to disk and nothing in this app runs at boot.</string>
+
+    <string name="status_done">DONE</string>
+    <string name="status_required">NEEDED</string>
+    <string name="status_optional">OPTIONAL</string>
+</resources>

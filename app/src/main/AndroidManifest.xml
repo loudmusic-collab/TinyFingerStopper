@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- The touch-blocking overlay. Also the documented exemption that lets the
+         app start a foreground service and relaunch an activity from the
+         background, which the snap-back watchdog relies on. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Special access, granted by the user in Settings, not a runtime prompt.
+         Used only to notice that the locked app stopped being the foreground
+         app so the watchdog can bring it back. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Kid Player only. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      DELIBERATELY ABSENT: the receive-boot-completed permission, and any receiver
+      for the boot broadcast.
+
+      A restart must always cancel the lock, so nothing in this app may run at boot.
+      LockSafetyTest greps this file for that broadcast's name and fails the build if
+      it ever turns up. See BootSafety.kt.
+    -->
+
+    <!-- Package visibility for getLaunchIntentForPackage in the watchdog. This is
+         the allowed, narrow alternative to QUERY_ALL_PACKAGES. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".TinyFingerApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:name=".ui.SetupActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".player.KidPlayerActivity"
+            android:exported="true"
+            android:label="@string/player_title"
+            android:launchMode="singleTask"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
+            android:theme="@style/PlayerTheme"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity">
+            <!-- Share a YouTube link from any app straight into the locked player. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".lock.OverlayLockService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Holds a touch-blocking overlay on screen while a child watches a video, for as long as the parent leaves it armed." />
+        </service>
+
+        <service
+            android:name=".tile.LockTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_lock"
+            android:label="@string/tile_label_off"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="false" />
+        </service>
+    </application>
+</manifest>
