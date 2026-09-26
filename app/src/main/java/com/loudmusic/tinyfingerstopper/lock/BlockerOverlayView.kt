@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.os.SystemClock
 import android.util.TypedValue
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 
@@ -68,6 +69,19 @@ class BlockerOverlayView(
         }
         // Always. This view exists to be a dead end for touches.
         return true
+    }
+
+    /**
+     * Swallow navigation keys, the Back gesture above all. Anything else - volume,
+     * mostly - falls through to the system as normal.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean = when (event.keyCode) {
+        KeyEvent.KEYCODE_BACK,
+        KeyEvent.KEYCODE_ESCAPE,
+        KeyEvent.KEYCODE_MENU,
+        KeyEvent.KEYCODE_SEARCH,
+        -> true
+        else -> super.dispatchKeyEvent(event)
     }
 
     override fun onDetachedFromWindow() {

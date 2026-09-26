@@ -21,7 +21,7 @@
     <string name="error_no_overlay_permission">Tiny Finger Stopper needs the "display over other apps" permission before it can lock the screen.</string>
     <string name="error_overlay_failed">Could not put the lock on screen. Check the "display over other apps" permission.</string>
     <string name="error_no_video_id">Paste a YouTube link or an 11-character video id.</string>
-    <string name="snap_back_gave_up">Something kept pulling the locked app off screen, so the lock was released.</string>
+    <string name="snap_back_paused">The locked app would not come back to the front, so snap-back has paused. The screen is still locked.</string>
 
     <string name="setup_overlay_heading">Overlay lock</string>
     <string name="setup_overlay_body">Works over any app. Start a video in YouTube, Disney+ or anything else, pull down Quick Settings and tap the Kid lock tile. Touches stop reaching the app underneath.</string>

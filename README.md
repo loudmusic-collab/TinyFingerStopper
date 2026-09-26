@@ -29,8 +29,9 @@ Being straight about this, because no app can block everything:
 | Taps and swipes on the video | Blocked | Blocked | Blocked |
 | Screen timing out | Blocked | Blocked | Blocked |
 | Volume keys | Not blocked | Not blocked | Blocked |
-| Notification shade | **Opens** | Blocked | Blocked |
-| Home / Back / Recents | Snaps back | Blocked | Blocked |
+| Notification shade | **Opens**, but nothing in it unlocks | Blocked | Blocked |
+| Back gesture | Swallowed | Swallowed | Swallowed |
+| Home / Recents | Snaps back | Blocked | Blocked |
 | Power button, reboot | Not blocked, on purpose — that is the way out |
 
 Two of those need explaining.
@@ -45,6 +46,13 @@ Reaching the shade gets you a status line and nothing else.
 **The bottom-edge Home gesture cannot be excluded by any ordinary app.** Rather
 than pretend otherwise, Overlay lock heals: with usage access granted it notices the
 foreground app changed and brings the video straight back, usually within a second.
+However many times it happens. Snap-back only pauses if the app *will not* come back
+— it crashed, say — and even then the touch blocker stays up. The watchdog has no
+way to release the lock at all; `LockSafetyTest` checks that.
+
+**Back is swallowed** because the overlay holds input focus. The Back gesture is
+delivered to whichever window has focus, so while the overlay has it, Back arrives
+at the overlay and goes nowhere.
 
 To shut the shade properly in Overlay mode, use **screen pinning** as well. Only the
 app being pinned can ask to be pinned, so the app cannot do it for you — instead set

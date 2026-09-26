@@ -18,17 +18,21 @@ import android.os.SystemClock
  * holds SYSTEM_ALERT_WINDOW, which is an explicit exemption from the background
  * activity launch restrictions.
  *
+ * This only ever moves apps around. It has no way to release the lock, on purpose:
+ * see [SnapBackPolicy].
+ *
  * Requires usage access. Without it the lock still works, it just cannot heal.
  */
 class ForegroundAppWatchdog(
     private val context: Context,
     private val targetPackage: String,
-    private val onGiveUp: () -> Unit,
+    private val onPaused: () -> Unit,
 ) {
 
     private val handler = Handler(Looper.getMainLooper())
     private val keyguard = context.getSystemService(KeyguardManager::class.java)
-    private val recentRelaunches = ArrayDeque<Long>()
+    private val policy = SnapBackPolicy()
+    private var lastRelaunchWallTime = 0L
     private var running = false
 
     private val poll = object : Runnable {
@@ -54,58 +58,75 @@ class ForegroundAppWatchdog(
         // The parent unlocking the phone is expected. Never fight the keyguard.
         if (keyguard?.isKeyguardLocked == true) return
 
-        val current = currentForegroundPackage(context) ?: return
-        if (current == targetPackage || current == context.packageName) return
+        val snapshot = snapshot(context, targetPackage, lastRelaunchWallTime) ?: return
+        val inFront = snapshot.latest == targetPackage || snapshot.latest == context.packageName
 
-        val now = SystemClock.elapsedRealtime()
-        recentRelaunches.addLast(now)
-        while (recentRelaunches.isNotEmpty() &&
-            now - recentRelaunches.first() > GIVE_UP_WINDOW_MS
-        ) {
-            recentRelaunches.removeFirst()
+        when (policy.decide(SystemClock.elapsedRealtime(), inFront, snapshot.targetReturned)) {
+            SnapBackPolicy.Action.NONE -> Unit
+            SnapBackPolicy.Action.RELAUNCH -> relaunch()
+            SnapBackPolicy.Action.PAUSE -> {
+                stop()
+                onPaused()
+            }
         }
-        // Snapping back over and over means we are losing to something we cannot
-        // beat - a system dialog, a crash loop, an app that will not resume. Let go
-        // rather than leave the phone unusable.
-        if (recentRelaunches.size > GIVE_UP_COUNT) {
-            stop()
-            onGiveUp()
-            return
-        }
+    }
 
+    private fun relaunch() {
         val launch = context.packageManager.getLaunchIntentForPackage(targetPackage) ?: return
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        lastRelaunchWallTime = System.currentTimeMillis()
         runCatching { context.startActivity(launch) }
     }
 
+    private class Snapshot(val latest: String?, val targetReturned: Boolean)
+
     companion object {
-        private const val POLL_MS = 900L
+        private const val POLL_MS = 500L
         private const val LOOKBACK_MS = 15_000L
-        private const val GIVE_UP_WINDOW_MS = 20_000L
-        private const val GIVE_UP_COUNT = 6
 
         /**
          * The most recently resumed activity's package, or null if usage access is
          * missing or nothing was resumed inside the lookback window.
          */
-        fun currentForegroundPackage(context: Context): String? {
+        fun currentForegroundPackage(context: Context): String? =
+            snapshot(context, targetPackage = null, sinceWallTime = 0L)?.latest
+
+        /**
+         * One pass over recent usage events: which package is in front now, and
+         * whether [targetPackage] came to the front at any point since [sinceWallTime].
+         * The second half is what lets a successful relaunch be recognised even if
+         * the child swiped it away again before the next poll.
+         */
+        private fun snapshot(
+            context: Context,
+            targetPackage: String?,
+            sinceWallTime: Long,
+        ): Snapshot? {
             val usageStats = context.getSystemService(UsageStatsManager::class.java)
                 ?: return null
             val end = System.currentTimeMillis()
-            val events = runCatching { usageStats.queryEvents(end - LOOKBACK_MS, end) }
+            val lookbackStart = end - LOOKBACK_MS
+            val start = if (sinceWallTime > 0L) minOf(sinceWallTime, lookbackStart) else lookbackStart
+            val events = runCatching { usageStats.queryEvents(start, end) }
                 .getOrNull() ?: return null
             val event = UsageEvents.Event()
             var latest: String? = null
+            var targetReturned = false
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
                 // ACTIVITY_RESUMED under its older name, which is the same constant
                 // and is the one that exists all the way back to our minSdk.
                 @Suppress("DEPRECATION")
-                if (event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) {
-                    latest = event.packageName
+                if (event.eventType != UsageEvents.Event.MOVE_TO_FOREGROUND) continue
+                latest = event.packageName
+                if (sinceWallTime > 0L &&
+                    event.packageName == targetPackage &&
+                    event.timeStamp >= sinceWallTime
+                ) {
+                    targetReturned = true
                 }
             }
-            return latest
+            return Snapshot(latest, targetReturned)
         }
     }
 }

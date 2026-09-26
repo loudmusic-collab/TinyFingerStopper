@@ -192,15 +192,19 @@ class OverlayLockService : Service() {
         // Nothing to snap back to if we cannot tell what was in front, or if what
         // was in front was us.
         if (target == null || target == packageName) return
+        // Pausing snap-back leaves the lock up. The watchdog only ever moves apps
+        // around; releasing the lock is not something it is allowed to do.
         watchdog = ForegroundAppWatchdog(this, target) {
-            Toast.makeText(this, R.string.snap_back_gave_up, Toast.LENGTH_LONG).show()
-            disarm()
+            Toast.makeText(this, R.string.snap_back_paused, Toast.LENGTH_LONG).show()
         }.also { it.start() }
     }
 
     private fun overlayParams(): WindowManager.LayoutParams {
-        var flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+        // Focusable on purpose. The Back gesture is delivered as a back key to
+        // whichever window has focus; if that is the app underneath, Back minimises
+        // the video and the watchdog never notices, because the same app is still
+        // in front. Holding focus ourselves means Back arrives here and goes nowhere.
+        var flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
         if (prefs.keepScreenOn) {
             flags = flags or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON

@@ -69,6 +69,28 @@ class LockSafetyTest {
     }
 
     @Test
+    fun `the snap-back watchdog cannot release the lock`() {
+        // It used to be able to: after a few snap-backs in a row it called disarm(),
+        // so swiping Home a handful of times broke straight through the lock. The
+        // watchdog only moves apps around. The ways out are the corner hold, the
+        // auto-unlock timer and a restart.
+        val watchdog = kotlinSources().single { it.name == "ForegroundAppWatchdog.kt" }.readText()
+        assertFalse(
+            "ForegroundAppWatchdog must not reach LockController.",
+            watchdog.contains("LockController"),
+        )
+
+        val service = kotlinSources().single { it.name == "OverlayLockService.kt" }.readText()
+        val start = service.indexOf("ForegroundAppWatchdog(this, target)")
+        assertTrue("could not find where the watchdog is created", start >= 0)
+        val callback = service.substring(start, service.indexOf("}.also", start))
+        assertFalse(
+            "The watchdog's pause callback must not disarm the lock.",
+            callback.contains("disarm"),
+        )
+    }
+
+    @Test
     fun `preferences hold settings only, never lock state`() {
         // Prefs is the only thing here allowed to touch disk. Pinning the exact set
         // of stored keys means adding one is a deliberate act with this test in view,
