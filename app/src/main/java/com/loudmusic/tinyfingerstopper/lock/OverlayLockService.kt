@@ -192,10 +192,10 @@ class OverlayLockService : Service() {
         // Nothing to snap back to if we cannot tell what was in front, or if what
         // was in front was us.
         if (target == null || target == packageName) return
-        // Pausing snap-back leaves the lock up. The watchdog only ever moves apps
-        // around; releasing the lock is not something it is allowed to do.
+        // Struggling to snap back leaves the lock up. The watchdog only ever moves
+        // apps around; releasing the lock is not something it is allowed to do.
         watchdog = ForegroundAppWatchdog(this, target) {
-            Toast.makeText(this, R.string.snap_back_paused, Toast.LENGTH_LONG).show()
+            Toast.makeText(this, R.string.snap_back_struggling, Toast.LENGTH_LONG).show()
         }.also { it.start() }
     }
 

@@ -112,6 +112,29 @@ class SetupActivity : Activity() {
             startActivity(UsageAccess.settingsIntent(this))
         }
 
+        // Only worth asking if YouTube is here; the query is covered by the
+        // manifest's <queries> block for launcher apps.
+        if (packageManager.getLaunchIntentForPackage(YOUTUBE_PACKAGE) != null) {
+            step(
+                title = getString(R.string.step_pip_title),
+                detail = getString(R.string.step_pip_detail),
+                // Another app's picture-in-picture permission cannot be read without
+                // privileged access, so this row can only ever offer, never tick.
+                done = false,
+                required = false,
+                action = getString(R.string.action_open_youtube_info),
+            ) {
+                runCatching {
+                    startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", YOUTUBE_PACKAGE, null),
+                        ),
+                    )
+                }
+            }
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             step(
                 title = getString(R.string.step_tile_title),
@@ -338,5 +361,6 @@ class SetupActivity : Activity() {
 
     private companion object {
         const val REQUEST_NOTIFICATIONS = 1
+        const val YOUTUBE_PACKAGE = "com.google.android.youtube"
     }
 }

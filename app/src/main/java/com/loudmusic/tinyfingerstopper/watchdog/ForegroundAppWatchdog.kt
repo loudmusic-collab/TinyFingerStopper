@@ -26,7 +26,7 @@ import android.os.SystemClock
 class ForegroundAppWatchdog(
     private val context: Context,
     private val targetPackage: String,
-    private val onPaused: () -> Unit,
+    private val onStruggling: () -> Unit,
 ) {
 
     private val handler = Handler(Looper.getMainLooper())
@@ -34,6 +34,7 @@ class ForegroundAppWatchdog(
     private val policy = SnapBackPolicy()
     private var lastRelaunchWallTime = 0L
     private var running = false
+    private var warnedStruggling = false
 
     private val poll = object : Runnable {
         override fun run() {
@@ -64,16 +65,24 @@ class ForegroundAppWatchdog(
         when (policy.decide(SystemClock.elapsedRealtime(), inFront, snapshot.targetReturned)) {
             SnapBackPolicy.Action.NONE -> Unit
             SnapBackPolicy.Action.RELAUNCH -> relaunch()
-            SnapBackPolicy.Action.PAUSE -> {
-                stop()
-                onPaused()
-            }
+        }
+
+        // Say so once per bad patch, not on every slowed-down retry.
+        if (policy.isStruggling && !warnedStruggling) {
+            warnedStruggling = true
+            onStruggling()
+        } else if (!policy.isStruggling) {
+            warnedStruggling = false
         }
     }
 
     private fun relaunch() {
         val launch = context.packageManager.getLaunchIntentForPackage(targetPackage) ?: return
-        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        // Exactly the flags a launcher sends when you tap an app's icon, so this does
+        // whatever tapping the icon would do. REORDER_TO_FRONT used to be here, and it
+        // reorders activities inside their task rather than moving the task itself -
+        // the wrong thing when the task is sitting in picture-in-picture.
+        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
         lastRelaunchWallTime = System.currentTimeMillis()
         runCatching { context.startActivity(launch) }
     }

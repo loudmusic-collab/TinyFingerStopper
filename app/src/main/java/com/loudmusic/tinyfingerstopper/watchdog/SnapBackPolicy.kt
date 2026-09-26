@@ -7,28 +7,33 @@ package com.loudmusic.tinyfingerstopper.watchdog
  * single poll:
  *
  *  - A child swiping Home over and over. Every relaunch works; they just keep
- *    undoing it. This must never stop the snap-back, however many times it happens.
- *  - An app that will not come back - it crashed, or a system dialog keeps winning.
- *    Relaunching forever is pointless, so after [maxFailedRelaunches] relaunches in a
- *    row that never brought it back, pause snap-back.
+ *    undoing it. This must never slow the snap-back, however many times it happens.
+ *  - A relaunch that is not landing - the app dropped into picture-in-picture, or a
+ *    system dialog is winning. Hammering it twice a second is pointless, so after
+ *    [maxFailedRelaunches] in a row that never brought it back, slow down to one try
+ *    every [backoffMillis]. Never stop: what failed a moment ago can work now.
  *
- * Either way the lock itself stays up. Pausing snap-back only stops the relaunching;
- * it never releases the touch blocker. The only ways out of the lock are the
+ * Either way the lock itself stays up. The policy only decides when to relaunch;
+ * nothing here can release the touch blocker. The ways out of the lock are the
  * two-corner hold, the auto-unlock timer and a restart.
  *
- * Pure and clock-injected so the exact pattern that broke on a real phone - Home,
- * snap back, Home again - can be tested on the JVM.
+ * Pure and clock-injected so the patterns seen on a real phone can be tested on
+ * the JVM.
  */
 class SnapBackPolicy(
     private val relaunchGraceMillis: Long = DEFAULT_GRACE_MILLIS,
     private val maxFailedRelaunches: Int = DEFAULT_MAX_FAILED,
+    private val backoffMillis: Long = DEFAULT_BACKOFF_MILLIS,
 ) {
 
-    enum class Action { NONE, RELAUNCH, PAUSE }
+    enum class Action { NONE, RELAUNCH }
 
     private var lastRelaunchAt = 0L
     private var awaitingReturn = false
     private var failedRelaunches = 0
+
+    /** Relaunches have failed often enough in a row that the policy has slowed down. */
+    val isStruggling: Boolean get() = failedRelaunches >= maxFailedRelaunches
 
     /**
      * @param targetInFront the locked app is in front right now.
@@ -47,14 +52,12 @@ class SnapBackPolicy(
             failedRelaunches = 0
             return Action.NONE
         }
-        if (awaitingReturn && now - lastRelaunchAt < relaunchGraceMillis) {
+        val wait = if (isStruggling) backoffMillis else relaunchGraceMillis
+        if (awaitingReturn && now - lastRelaunchAt < wait) {
             // Give the last relaunch time to land before judging it.
             return Action.NONE
         }
-        if (awaitingReturn) {
-            failedRelaunches++
-            if (failedRelaunches >= maxFailedRelaunches) return Action.PAUSE
-        }
+        if (awaitingReturn) failedRelaunches++
         lastRelaunchAt = now
         awaitingReturn = true
         return Action.RELAUNCH
@@ -63,5 +66,6 @@ class SnapBackPolicy(
     companion object {
         const val DEFAULT_GRACE_MILLIS = 1_500L
         const val DEFAULT_MAX_FAILED = 5
+        const val DEFAULT_BACKOFF_MILLIS = 5_000L
     }
 }

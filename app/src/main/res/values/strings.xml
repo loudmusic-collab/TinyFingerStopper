@@ -21,7 +21,7 @@
     <string name="error_no_overlay_permission">Tiny Finger Stopper needs the "display over other apps" permission before it can lock the screen.</string>
     <string name="error_overlay_failed">Could not put the lock on screen. Check the "display over other apps" permission.</string>
     <string name="error_no_video_id">Paste a YouTube link or an 11-character video id.</string>
-    <string name="snap_back_paused">The locked app would not come back to the front, so snap-back has paused. The screen is still locked.</string>
+    <string name="snap_back_struggling">Could not bring the locked app back to the front. The screen is still locked, and it will keep trying.</string>
 
     <string name="setup_overlay_heading">Overlay lock</string>
     <string name="setup_overlay_body">Works over any app. Start a video in YouTube, Disney+ or anything else, pull down Quick Settings and tap the Kid lock tile. Touches stop reaching the app underneath.</string>
@@ -35,6 +35,9 @@
     <string name="step_tile_title">Quick Settings tile</string>
     <string name="step_tile_detail">Optional. Adds the Kid lock tile so you can arm it in one tap.</string>
     <string name="step_tile_detail_manual">To add the tile: pull down Quick Settings, tap the edit (pencil) button, and drag "Kid lock" into the panel.</string>
+    <string name="step_pip_title">Turn off picture-in-picture for YouTube</string>
+    <string name="step_pip_detail">Recommended. Swiping Home during a video makes YouTube shrink into a floating window, and a floating window cannot be pulled back to full screen by another app, so snap-back cannot undo it. On YouTube\'s app info page, find Picture-in-picture and turn it off.</string>
+    <string name="action_open_youtube_info">Open YouTube app info</string>
     <string name="action_grant">Grant</string>
     <string name="action_add_tile">Add tile</string>
     <string name="action_open_settings">Open settings</string>

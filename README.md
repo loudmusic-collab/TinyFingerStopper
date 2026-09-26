@@ -46,9 +46,16 @@ Reaching the shade gets you a status line and nothing else.
 **The bottom-edge Home gesture cannot be excluded by any ordinary app.** Rather
 than pretend otherwise, Overlay lock heals: with usage access granted it notices the
 foreground app changed and brings the video straight back, usually within a second.
-However many times it happens. Snap-back only pauses if the app *will not* come back
-— it crashed, say — and even then the touch blocker stays up. The watchdog has no
-way to release the lock at all; `LockSafetyTest` checks that.
+However many times it happens. If a relaunch is not landing it slows to one try every
+five seconds, but it never stops, and the touch blocker stays up throughout. The
+watchdog has no way to release the lock at all; `LockSafetyTest` checks that.
+
+**Turn off picture-in-picture for YouTube.** Swiping Home during a video makes
+YouTube shrink into a floating window, and no other app can pull a floating window
+back to full screen, so snap-back cannot undo it. The lock still holds — the
+floating window is under the overlay too, so it cannot be moved or closed — but the
+video is small. Setup has a button to YouTube's app info page, where the
+Picture-in-picture switch lives. Kid Player does not have this problem.
 
 **Back is swallowed** because the overlay holds input focus. The Back gesture is
 delivered to whichever window has focus, so while the overlay has it, Back arrives
