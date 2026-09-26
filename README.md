@@ -24,18 +24,32 @@ unpinning** in Android's security settings and leaving it needs your device PIN.
 
 Being straight about this, because no app can block everything:
 
-| Escape route | Overlay lock | Kid Player |
-|---|---|---|
-| Taps and swipes on the video | Blocked | Blocked |
-| Screen timing out | Blocked | Blocked |
-| Volume keys | Not blocked | Blocked |
-| Notification shade | Partly, varies by device | Blocked by pinning |
-| Home / Back / Recents | Not preventable — snaps back instead | Blocked by pinning |
+| Escape route | Overlay lock | Overlay + pinning | Kid Player |
+|---|---|---|---|
+| Taps and swipes on the video | Blocked | Blocked | Blocked |
+| Screen timing out | Blocked | Blocked | Blocked |
+| Volume keys | Not blocked | Not blocked | Blocked |
+| Notification shade | **Opens** | Blocked | Blocked |
+| Home / Back / Recents | Snaps back | Blocked | Blocked |
 | Power button, reboot | Not blocked, on purpose — that is the way out |
 
-The bottom-edge Home gesture cannot be excluded by any ordinary app. Rather than
-pretend otherwise, Overlay lock heals: with usage access granted it notices the
+Two of those need explaining.
+
+**The notification shade opens over Overlay lock, and cannot be stopped.** Android
+puts the shade above every app overlay by design; the usual tricks for covering the
+status bar do not change the z-order. So the shade is treated as a leak to be made
+harmless rather than one to be plugged: the Quick Settings tile **only arms, never
+releases**, and the ongoing notification has **no buttons and no tap target**.
+Reaching the shade gets you a status line and nothing else.
+
+**The bottom-edge Home gesture cannot be excluded by any ordinary app.** Rather
+than pretend otherwise, Overlay lock heals: with usage access granted it notices the
 foreground app changed and brings the video straight back, usually within a second.
+
+To shut the shade properly in Overlay mode, use **screen pinning** as well. Only the
+app being pinned can ask to be pinned, so the app cannot do it for you — instead set
+an **arm delay** in setup, tap the tile, and pin the app from Recents during the
+countdown. Or just use Kid Player, where pinning is built in.
 
 ## Unlocking
 
@@ -44,12 +58,16 @@ and hold for two seconds. A small hand cannot span the diagonal of a phone, and
 nothing is drawn on screen until the hold is already well underway, so there is no
 affordance to discover by mashing.
 
-There are four ways out, by design:
+There are three ways out, by design:
 
 1. The two-corner hold.
-2. The **Unlock** action on the ongoing notification.
-3. **Restarting the phone.**
-4. Auto-unlock, after 90 minutes by default.
+2. **Restarting the phone.**
+3. Auto-unlock, after 90 minutes by default.
+
+Note what is *not* on that list: the tile and the notification. Both live in the
+notification shade, which is within reach of whoever is holding the phone, so
+neither can release the lock. Arming and disarming are deliberately asymmetric —
+one tap in, two hands out.
 
 ## A restart always cancels the lock
 
@@ -110,6 +128,6 @@ The ones that actually matter, on a real device:
 
 ## Not done yet
 
-- PIN as an alternative to the corner hold (`Prefs` already stores one).
+- PIN as an alternative to the corner hold (`Prefs` already stores a salted hash).
 - Auto-disarm on an incoming call.
 - A settings screen for hold duration and auto-unlock timeout.

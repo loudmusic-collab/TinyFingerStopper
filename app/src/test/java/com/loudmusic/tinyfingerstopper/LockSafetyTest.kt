@@ -83,6 +83,7 @@ class LockSafetyTest {
                 "armed must stay in memory only, so that a restart clears it. If the " +
                 "new key really is just a setting, add it here.",
             sortedSetOf(
+                "arm_delay_seconds",
                 "auto_unlock_minutes",
                 "hold_millis",
                 "keep_screen_on",

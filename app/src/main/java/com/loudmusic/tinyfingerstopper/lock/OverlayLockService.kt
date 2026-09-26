@@ -3,13 +3,11 @@ package com.loudmusic.tinyfingerstopper.lock
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
-import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -32,10 +30,15 @@ import com.loudmusic.tinyfingerstopper.watchdog.UsageAccess
  * Nothing about the armed state is written to disk, and the service refuses to
  * re-arm itself on a system restart, so a reboot or a low-memory kill always
  * leaves the phone unlocked. See [BootSafety].
+ *
+ * The ongoing notification carries no unlock button. Android puts the notification
+ * shade above any app overlay, so anything tappable there is a one-tap way out of
+ * the lock for whoever is holding the phone.
  */
 class OverlayLockService : Service() {
 
     private lateinit var windowManager: WindowManager
+    private lateinit var notificationManager: NotificationManager
     private lateinit var prefs: Prefs
 
     private val handler = Handler(Looper.getMainLooper())
@@ -43,6 +46,19 @@ class OverlayLockService : Service() {
     private var watchdog: ForegroundAppWatchdog? = null
     private var autoUnlockDeadline = 0L
     private var autoUnlockWindow = 0L
+    private var secondsUntilArmed = 0
+
+    private val countdownTick = object : Runnable {
+        override fun run() {
+            secondsUntilArmed--
+            if (secondsUntilArmed <= 0) {
+                addOverlayAndArm()
+            } else {
+                notificationManager.notify(NOTIFICATION_ID, pendingNotification(secondsUntilArmed))
+                handler.postDelayed(this, 1_000L)
+            }
+        }
+    }
 
     private val autoUnlockCheck = object : Runnable {
         override fun run() {
@@ -61,7 +77,9 @@ class OverlayLockService : Service() {
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WindowManager::class.java)
+        notificationManager = getSystemService(NotificationManager::class.java)
         prefs = Prefs(this)
+        createChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -72,8 +90,8 @@ class OverlayLockService : Service() {
             return START_NOT_STICKY
         }
         when (intent.action) {
-            ACTION_ARM -> arm()
-            ACTION_DISARM -> disarm()
+            ACTION_ARM -> handleArm()
+            ACTION_CANCEL_PENDING -> cancelPending()
             else -> stopSelf()
         }
         return START_NOT_STICKY
@@ -86,31 +104,61 @@ class OverlayLockService : Service() {
         super.onDestroy()
     }
 
-    private fun arm() {
-        if (overlay != null) return
+    private fun handleArm() {
+        if (LockController.state != LockController.State.IDLE) return
         if (!Settings.canDrawOverlays(this)) {
             Toast.makeText(this, R.string.error_no_overlay_permission, Toast.LENGTH_LONG).show()
             stopSelf()
             return
         }
 
-        startInForeground()
+        val delay = prefs.armDelaySeconds
+        if (delay <= 0) {
+            startInForeground(armedNotification())
+            addOverlayAndArm()
+            return
+        }
+
+        // Give the parent a window to pin the app from Recents first. Screen pinning
+        // is the only thing that actually keeps the shade shut, and it cannot be
+        // started from here because only the app being pinned can ask for it.
+        secondsUntilArmed = delay
+        startInForeground(pendingNotification(delay))
+        LockController.setState(LockController.State.PENDING)
+        requestTileUpdate()
+        handler.postDelayed(countdownTick, 1_000L)
+    }
+
+    private fun addOverlayAndArm() {
+        handler.removeCallbacks(countdownTick)
+        if (overlay != null) return
 
         val view = BlockerOverlayView(this, prefs.holdMillis) { disarm() }
-        val added = runCatching { windowManager.addView(view, overlayParams()) }.isSuccess
-        if (!added) {
+        if (runCatching { windowManager.addView(view, overlayParams()) }.isFailure) {
             Toast.makeText(this, R.string.error_overlay_failed, Toast.LENGTH_LONG).show()
+            LockController.setState(LockController.State.IDLE)
+            requestTileUpdate()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return
         }
         overlay = view
 
+        notificationManager.notify(NOTIFICATION_ID, armedNotification())
         startAutoUnlock()
         startWatchdog()
 
-        LockController.setArmed(true)
+        LockController.setState(LockController.State.ARMED)
         requestTileUpdate()
+    }
+
+    private fun cancelPending() {
+        if (LockController.state != LockController.State.PENDING) return
+        // Nothing is locked yet, so there is nothing to protect here.
+        teardown()
+        requestTileUpdate()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     private fun disarm() {
@@ -121,12 +169,13 @@ class OverlayLockService : Service() {
     }
 
     private fun teardown() {
+        handler.removeCallbacks(countdownTick)
         handler.removeCallbacks(autoUnlockCheck)
         watchdog?.stop()
         watchdog = null
         overlay?.let { view -> runCatching { windowManager.removeView(view) } }
         overlay = null
-        LockController.setArmed(false)
+        LockController.setState(LockController.State.IDLE)
     }
 
     private fun startAutoUnlock() {
@@ -172,8 +221,7 @@ class OverlayLockService : Service() {
         }
     }
 
-    private fun startInForeground() {
-        val notification = buildNotification()
+    private fun startInForeground(notification: Notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 NOTIFICATION_ID,
@@ -185,9 +233,8 @@ class OverlayLockService : Service() {
         }
     }
 
-    private fun buildNotification(): Notification {
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(
+    private fun createChannel() {
+        notificationManager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
                 getString(R.string.channel_name),
@@ -197,31 +244,36 @@ class OverlayLockService : Service() {
                 setShowBadge(false)
             },
         )
+    }
 
-        // The parent's escape hatch if the two-corner hold is not working for them.
-        val unlock = PendingIntent.getService(
-            this,
-            REQUEST_UNLOCK,
-            Intent(this, OverlayLockService::class.java).setAction(ACTION_DISARM),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    private fun armedNotification(): Notification = baseNotification()
+        .setContentTitle(getString(R.string.notification_title))
+        .setContentText(getString(R.string.notification_text))
+        .setStyle(
+            Notification.BigTextStyle().bigText(getString(R.string.notification_text)),
         )
+        .build()
 
-        return Notification.Builder(this, CHANNEL_ID)
+    private fun pendingNotification(seconds: Int): Notification = baseNotification()
+        .setContentTitle(getString(R.string.notification_pending_title, seconds))
+        .setContentText(getString(R.string.notification_pending_text))
+        .setStyle(
+            Notification.BigTextStyle()
+                .bigText(getString(R.string.notification_pending_text)),
+        )
+        .build()
+
+    /**
+     * No actions and no content intent. Everything tappable in the shade is
+     * reachable by whoever is holding the phone, so the shade gets to be a status
+     * display and nothing more.
+     */
+    private fun baseNotification(): Notification.Builder =
+        Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_lock)
-            .setContentTitle(getString(R.string.notification_title))
-            .setContentText(getString(R.string.notification_text))
             .setCategory(Notification.CATEGORY_SERVICE)
             .setOngoing(true)
             .setShowWhen(false)
-            .addAction(
-                Notification.Action.Builder(
-                    Icon.createWithResource(this, R.drawable.ic_unlock),
-                    getString(R.string.action_unlock),
-                    unlock,
-                ).build(),
-            )
-            .build()
-    }
 
     private fun requestTileUpdate() {
         runCatching {
@@ -234,11 +286,10 @@ class OverlayLockService : Service() {
 
     companion object {
         const val ACTION_ARM = "com.loudmusic.tinyfingerstopper.ARM"
-        const val ACTION_DISARM = "com.loudmusic.tinyfingerstopper.DISARM"
+        const val ACTION_CANCEL_PENDING = "com.loudmusic.tinyfingerstopper.CANCEL_PENDING"
 
         private const val CHANNEL_ID = "lock_status"
         private const val NOTIFICATION_ID = 1
-        private const val REQUEST_UNLOCK = 100
         private const val AUTO_UNLOCK_RECHECK_MS = 30_000L
     }
 }

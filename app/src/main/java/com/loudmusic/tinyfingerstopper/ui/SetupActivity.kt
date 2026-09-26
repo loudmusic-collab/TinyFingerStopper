@@ -127,6 +127,24 @@ class SetupActivity : Activity() {
         }
 
         divider()
+        heading(getString(R.string.setup_shade_heading))
+        body(getString(R.string.setup_shade_body))
+
+        setting(
+            title = getString(R.string.setting_arm_delay_title),
+            detail = getString(R.string.setting_arm_delay_detail),
+            value = armDelayLabel(prefs.armDelaySeconds),
+        ) {
+            // Cycle rather than open a dialog; there are only three sensible values.
+            prefs.armDelaySeconds = when (prefs.armDelaySeconds) {
+                0 -> 5
+                5 -> 10
+                else -> 0
+            }
+            render()
+        }
+
+        divider()
         heading(getString(R.string.setup_player_heading))
         body(getString(R.string.setup_player_body))
 
@@ -265,6 +283,45 @@ class SetupActivity : Activity() {
                 }.also { it.gravity = Gravity.CENTER },
             )
         }
+        container.addView(row, rowParams())
+    }
+
+    private fun armDelayLabel(seconds: Int): String = if (seconds <= 0) {
+        getString(R.string.setting_arm_delay_none)
+    } else {
+        getString(R.string.setting_arm_delay_seconds, seconds)
+    }
+
+    private fun setting(
+        title: String,
+        detail: String,
+        value: String,
+        onClick: () -> Unit,
+    ) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(12), 0, dp(12))
+        }
+        row.addView(
+            TextView(this).apply {
+                text = title
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+            },
+        )
+        row.addView(
+            TextView(this).apply {
+                text = detail
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setPadding(0, dp(2), 0, dp(6))
+            },
+        )
+        row.addView(
+            Button(this).apply {
+                text = value
+                setOnClickListener { onClick() }
+            },
+        )
         container.addView(row, rowParams())
     }
 

@@ -7,16 +7,18 @@ import android.os.Build
 import android.provider.Settings
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import android.widget.Toast
 import com.loudmusic.tinyfingerstopper.R
 import com.loudmusic.tinyfingerstopper.lock.LockController
 import com.loudmusic.tinyfingerstopper.ui.SetupActivity
 
 /**
- * The Quick Settings toggle.
+ * The Quick Settings toggle - except it only goes one way.
  *
- * Arming is one tap because it has to be - you are already holding a phone a child
- * is reaching for. Disarming is deliberately not here: it is the two-corner hold on
- * the overlay itself, or the notification's Unlock action.
+ * Arming is one tap. Disarming is not here at all: anyone who can pull down the
+ * shade can reach this tile, and that includes the child holding the phone. The
+ * ways out are the two-corner hold on the overlay, the auto-unlock timer, and
+ * restarting the phone.
  */
 class LockTileService : TileService(), LockController.Listener {
 
@@ -32,28 +34,51 @@ class LockTileService : TileService(), LockController.Listener {
         super.onStopListening()
     }
 
-    override fun onArmedChanged(armed: Boolean) {
+    override fun onStateChanged(state: LockController.State) {
         val tile = qsTile ?: return
-        tile.state = if (armed) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+        tile.state = when (state) {
+            LockController.State.IDLE -> Tile.STATE_INACTIVE
+            LockController.State.PENDING, LockController.State.ARMED -> Tile.STATE_ACTIVE
+        }
+        val labelRes = when (state) {
+            LockController.State.IDLE -> R.string.tile_label_off
+            LockController.State.PENDING -> R.string.tile_label_pending
+            LockController.State.ARMED -> R.string.tile_label_on
+        }
+        val subtitleRes = when (state) {
+            LockController.State.IDLE -> R.string.tile_subtitle_off
+            LockController.State.PENDING -> R.string.tile_subtitle_pending
+            LockController.State.ARMED -> R.string.tile_subtitle_on
+        }
         tile.icon = Icon.createWithResource(
             this,
-            if (armed) R.drawable.ic_lock else R.drawable.ic_unlock,
+            if (state == LockController.State.IDLE) R.drawable.ic_unlock else R.drawable.ic_lock,
         )
-        tile.label = getString(if (armed) R.string.tile_label_on else R.string.tile_label_off)
+        tile.label = getString(labelRes)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            tile.subtitle =
-                getString(if (armed) R.string.tile_subtitle_on else R.string.tile_subtitle_off)
+            tile.subtitle = getString(subtitleRes)
         }
         tile.updateTile()
     }
 
     override fun onClick() {
         super.onClick()
-        if (!Settings.canDrawOverlays(this)) {
-            openSetup()
-            return
+        when (LockController.state) {
+            LockController.State.ARMED ->
+                // Deliberately inert. Say what does work instead.
+                Toast.makeText(this, R.string.tile_hint_armed, Toast.LENGTH_LONG).show()
+
+            LockController.State.PENDING ->
+                // Nothing is locked yet, so backing out is still free.
+                LockController.cancelPending(this)
+
+            LockController.State.IDLE ->
+                if (Settings.canDrawOverlays(this)) {
+                    LockController.arm(this)
+                } else {
+                    openSetup()
+                }
         }
-        LockController.toggle(this)
     }
 
     private fun openSetup() {

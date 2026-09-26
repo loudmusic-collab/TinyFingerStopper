@@ -19,6 +19,15 @@ class Prefs(context: Context) {
         get() = sp.getLong(KEY_HOLD_MILLIS, DEFAULT_HOLD_MILLIS)
         set(value) = sp.edit().putLong(KEY_HOLD_MILLIS, value).apply()
 
+    /**
+     * Seconds to wait after the tile is tapped before the lock actually goes up.
+     * A delay is what makes it possible to pin the app from Recents first, which is
+     * the only thing that keeps the notification shade shut. 0 locks immediately.
+     */
+    var armDelaySeconds: Int
+        get() = sp.getInt(KEY_ARM_DELAY_SECONDS, 0)
+        set(value) = sp.edit().putInt(KEY_ARM_DELAY_SECONDS, value).apply()
+
     /** Release the lock unattended after this many minutes. 0 disables it. */
     var autoUnlockMinutes: Int
         get() = sp.getInt(KEY_AUTO_UNLOCK_MINUTES, DEFAULT_AUTO_UNLOCK_MINUTES)
@@ -71,6 +80,7 @@ class Prefs(context: Context) {
 
         private const val SALT = "tinyfingerstopper:v1:"
         private const val KEY_HOLD_MILLIS = "hold_millis"
+        private const val KEY_ARM_DELAY_SECONDS = "arm_delay_seconds"
         private const val KEY_AUTO_UNLOCK_MINUTES = "auto_unlock_minutes"
         private const val KEY_KEEP_SCREEN_ON = "keep_screen_on"
         private const val KEY_SNAP_BACK = "snap_back"

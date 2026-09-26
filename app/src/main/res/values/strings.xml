@@ -5,14 +5,18 @@
 
     <string name="tile_label_off">Kid lock</string>
     <string name="tile_label_on">Kid lock on</string>
+    <string name="tile_label_pending">Kid lock arming</string>
     <string name="tile_subtitle_off">Tap to lock the screen</string>
     <string name="tile_subtitle_on">Hold two opposite corners</string>
+    <string name="tile_subtitle_pending">Tap to cancel</string>
+    <string name="tile_hint_armed">The tile cannot unlock. Hold two opposite corners for two seconds, or restart the phone.</string>
 
     <string name="channel_name">Kid lock</string>
     <string name="channel_description">Shown while the screen is locked for a child.</string>
     <string name="notification_title">Screen locked for little hands</string>
-    <string name="notification_text">Hold two opposite corners for two seconds to unlock. Restarting the phone also unlocks it.</string>
-    <string name="action_unlock">Unlock</string>
+    <string name="notification_text">Hold two opposite corners for two seconds to unlock. Restarting the phone also unlocks it. There is no button here on purpose: anything tappable in this shade is within reach of whoever is holding the phone.</string>
+    <string name="notification_pending_title">Locking in %1$d\u2026</string>
+    <string name="notification_pending_text">Pin the app now if you want the notification shade blocked too: open Recents, then tap the pin icon on the app. Tap the Kid lock tile again to cancel.</string>
 
     <string name="error_no_overlay_permission">Tiny Finger Stopper needs the "display over other apps" permission before it can lock the screen.</string>
     <string name="error_overlay_failed">Could not put the lock on screen. Check the "display over other apps" permission.</string>
@@ -41,6 +45,14 @@
     <string name="step_pinning_detail">Strongly recommended. In Security (or Security and privacy) find App pinning, turn it on, and turn on "Ask for PIN before unpinning". With that set, leaving Kid Player needs your device PIN.</string>
     <string name="video_hint">YouTube link or video id</string>
     <string name="action_play_locked">Play locked</string>
+
+    <string name="setting_arm_delay_title">Arm delay</string>
+    <string name="setting_arm_delay_none">Lock immediately</string>
+    <string name="setting_arm_delay_seconds">Wait %1$d seconds</string>
+    <string name="setting_arm_delay_detail">Android puts the notification shade above any app overlay, so an overlay alone cannot keep it shut. Screen pinning can, but only the app being pinned may ask for it. A delay gives you time to pin the app from Recents yourself before the lock goes up.</string>
+
+    <string name="setup_shade_heading">Blocking the notification shade</string>
+    <string name="setup_shade_body">The tile can only arm the lock, never release it, so reaching the shade is no longer a way out. If you want the shade shut as well, either use Kid Player below, or set an arm delay and pin the app from Recents during the countdown.</string>
 
     <string name="setup_unlock_help">To unlock either mode: put one finger in one corner and another finger in the diagonally opposite corner, and hold for two seconds.</string>
     <string name="setup_reboot_help">Restarting the phone always cancels the lock. Nothing about the lock is saved to disk and nothing in this app runs at boot.</string>
