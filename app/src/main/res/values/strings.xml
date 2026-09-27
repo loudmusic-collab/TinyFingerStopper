@@ -20,6 +20,10 @@
 
     <string name="error_no_overlay_permission">Tiny Finger Stopper needs the "display over other apps" permission before it can lock the screen.</string>
     <string name="error_overlay_failed">Could not put the lock on screen. Check the "display over other apps" permission.</string>
+    <string name="player_error_embedding_disabled">This video\'s owner does not allow it to play outside YouTube. Use the overlay lock for this one.</string>
+    <string name="player_error_rejected">YouTube refused to play this in Kid Player (error %1$d).</string>
+    <string name="player_error_unavailable">That video is private, removed, or not available here.</string>
+    <string name="player_error_generic">YouTube could not play this video (error %1$d).</string>
     <string name="error_no_video_id">Paste a YouTube link or an 11-character video id.</string>
     <string name="snap_back_struggling">Could not bring the locked app back to the front. The screen is still locked, and it will keep trying.</string>
 

@@ -2,6 +2,7 @@ package com.loudmusic.tinyfingerstopper.player
 
 import android.app.Activity
 import android.app.ActivityManager
+import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -10,8 +11,11 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
 import com.loudmusic.tinyfingerstopper.R
@@ -35,6 +39,15 @@ class KidPlayerActivity : Activity() {
     private lateinit var blocker: BlockerOverlayView
     private var locked = false
 
+    /**
+     * YouTube refuses to play an embed it cannot attribute to an embedding site or
+     * app (errors 150 to 153). Apps identify themselves as `https://<application-id>/`,
+     * and for a page loaded with loadDataWithBaseURL the base URL is what becomes the
+     * Referer. This used to be https://www.youtube.com, which claims to be YouTube
+     * itself, and YouTube rejected it.
+     */
+    private val appOrigin: String get() = "https://$packageName"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -56,6 +69,8 @@ class KidPlayerActivity : Activity() {
             // The IFrame player asks for fullscreen; without a chrome client that
             // request is silently dropped.
             webChromeClient = WebChromeClient()
+            webViewClient = StayOnPlayer()
+            addJavascriptInterface(PlayerBridge(), BRIDGE_NAME)
         }
         root.addView(web, matchParent())
 
@@ -64,10 +79,10 @@ class KidPlayerActivity : Activity() {
         root.addView(blocker, matchParent())
 
         setContentView(root)
-        web.loadDataWithBaseURL(BASE_URL, playerHtml(videoId), "text/html", "utf-8", null)
-
-        // Give the video a moment to start before the screen stops accepting input.
-        web.postDelayed({ lock() }, LOCK_DELAY_MS)
+        web.loadDataWithBaseURL("$appOrigin/", playerHtml(videoId), "text/html", "utf-8", null)
+        // No lock yet. It goes on when the player reports that the video is actually
+        // playing, so a video YouTube refuses to play never leaves you pinned to an
+        // error screen.
     }
 
     override fun onResume() {
@@ -77,7 +92,8 @@ class KidPlayerActivity : Activity() {
 
     override fun onDestroy() {
         if (locked) unlock()
-        web.destroy()
+        // onCreate bails out before building the WebView when there is no video id.
+        if (::web.isInitialized) web.destroy()
         super.onDestroy()
     }
 
@@ -115,9 +131,45 @@ class KidPlayerActivity : Activity() {
         }
     }
 
+    private fun onPlayerError(code: Int) {
+        val message = when (code) {
+            101, 150 -> getString(R.string.player_error_embedding_disabled)
+            152, 153 -> getString(R.string.player_error_rejected, code)
+            100 -> getString(R.string.player_error_unavailable)
+            else -> getString(R.string.player_error_generic, code)
+        }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        // Only give up if the lock never went on. Once it is on, the ways out stay
+        // what they always are: the corner hold, the unpin gesture, or a restart.
+        if (!locked) finish()
+    }
+
+    /**
+     * Keeps everything inside the player. Links in the embed - the YouTube logo,
+     * "Watch on YouTube", end screens - navigate the top frame or hand off to the
+     * YouTube app, and either would be a way out. The player's own frame still loads.
+     */
+    private class StayOnPlayer : WebViewClient() {
+        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
+            request.isForMainFrame
+    }
+
+    /** The page's only way to talk back. Called on a WebView thread. */
+    private inner class PlayerBridge {
+        @JavascriptInterface
+        fun onPlaying() {
+            runOnUiThread { lock() }
+        }
+
+        @JavascriptInterface
+        fun onPlayerError(code: Int) {
+            runOnUiThread { this@KidPlayerActivity.onPlayerError(code) }
+        }
+    }
+
     private fun resolveVideoId(): String? {
         val fromExtra = intent?.getStringExtra(EXTRA_VIDEO)
-        val fromShare = intent?.getStringExtra(android.content.Intent.EXTRA_TEXT)
+        val fromShare = intent?.getStringExtra(Intent.EXTRA_TEXT)
         val fromData = intent?.dataString
         return YouTubeLinks.extractVideoId(fromExtra)
             ?: YouTubeLinks.extractVideoId(fromShare)
@@ -149,23 +201,28 @@ class KidPlayerActivity : Activity() {
         FrameLayout.LayoutParams.MATCH_PARENT,
     )
 
-    private fun playerHtml(videoId: String) = PLAYER_HTML.replace(VIDEO_ID_TOKEN, videoId)
+    private fun playerHtml(videoId: String) = PLAYER_HTML
+        .replace(VIDEO_ID_TOKEN, videoId)
+        .replace(ORIGIN_TOKEN, appOrigin)
 
     companion object {
         const val EXTRA_VIDEO = "com.loudmusic.tinyfingerstopper.VIDEO"
 
-        private const val BASE_URL = "https://www.youtube.com"
+        private const val BRIDGE_NAME = "TinyFinger"
         private const val VIDEO_ID_TOKEN = "__VIDEO_ID__"
-        private const val LOCK_DELAY_MS = 1_500L
+        private const val ORIGIN_TOKEN = "__ORIGIN__"
 
         // The official IFrame Player API, which is the supported way to embed a
-        // YouTube video in your own surface.
+        // YouTube video in your own surface. The referrer policy is spelled out
+        // rather than left to the WebView's default, because a Referer that never
+        // arrives is the other common cause of YouTube's configuration errors.
         private val PLAYER_HTML = """
             <!doctype html>
             <html>
             <head>
               <meta name="viewport"
                     content="width=device-width, initial-scale=1, user-scalable=no">
+              <meta name="referrer" content="strict-origin-when-cross-origin">
               <style>
                 html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
                 #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
@@ -175,12 +232,28 @@ class KidPlayerActivity : Activity() {
               <div id="player"></div>
               <script src="https://www.youtube.com/iframe_api"></script>
               <script>
+                function bridge() {
+                  return typeof TinyFinger === 'undefined' ? null : TinyFinger;
+                }
                 function onYouTubeIframeAPIReady() {
                   new YT.Player('player', {
                     videoId: '__VIDEO_ID__',
-                    playerVars: { autoplay: 1, playsinline: 1, rel: 0, controls: 1 },
+                    playerVars: {
+                      autoplay: 1,
+                      playsinline: 1,
+                      rel: 0,
+                      controls: 1,
+                      origin: '__ORIGIN__',
+                      widget_referrer: '__ORIGIN__'
+                    },
                     events: {
-                      onReady: function (e) { e.target.playVideo(); }
+                      onReady: function (e) { e.target.playVideo(); },
+                      onStateChange: function (e) {
+                        if (e.data === YT.PlayerState.PLAYING && bridge()) bridge().onPlaying();
+                      },
+                      onError: function (e) {
+                        if (bridge()) bridge().onPlayerError(e.data);
+                      }
                     }
                   });
                 }
