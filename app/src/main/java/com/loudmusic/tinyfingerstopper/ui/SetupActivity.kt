@@ -1,6 +1,7 @@
 package com.loudmusic.tinyfingerstopper.ui
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.StatusBarManager
 import android.content.ComponentName
 import android.content.Intent
@@ -158,13 +159,7 @@ class SetupActivity : Activity() {
             detail = getString(R.string.setting_arm_delay_detail),
             value = armDelayLabel(prefs.armDelaySeconds),
         ) {
-            // Cycle rather than open a dialog; there are only three sensible values.
-            prefs.armDelaySeconds = when (prefs.armDelaySeconds) {
-                0 -> 5
-                5 -> 10
-                else -> 0
-            }
-            render()
+            showArmDelayPicker()
         }
 
         divider()
@@ -309,6 +304,24 @@ class SetupActivity : Activity() {
         container.addView(row, rowParams())
     }
 
+    private fun showArmDelayPicker() {
+        val current = prefs.armDelaySeconds
+        // Keep a previously saved value selectable even if it is not in the presets.
+        val choices = (ARM_DELAY_CHOICES + current).filter { it >= 0 }.distinct().sorted()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.setting_arm_delay_title)
+            .setSingleChoiceItems(
+                choices.map { armDelayLabel(it) }.toTypedArray(),
+                choices.indexOf(current),
+            ) { dialog, which ->
+                prefs.armDelaySeconds = choices[which]
+                dialog.dismiss()
+                render()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     private fun armDelayLabel(seconds: Int): String = if (seconds <= 0) {
         getString(R.string.setting_arm_delay_none)
     } else {
@@ -362,5 +375,8 @@ class SetupActivity : Activity() {
     private companion object {
         const val REQUEST_NOTIFICATIONS = 1
         const val YOUTUBE_PACKAGE = "com.google.android.youtube"
+
+        /** Seconds; 0 locks immediately. */
+        val ARM_DELAY_CHOICES = listOf(0, 3, 5, 10, 15, 20, 30, 45, 60)
     }
 }
